@@ -1,0 +1,64 @@
+#exposing rag model as a rest api, creating flask api
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/generate-response', methods=['POST'])
+def generate_response():
+    data = request.json
+    query = data.get('query')
+    # Load PDF, process it, etc.
+    pdf_text = extract_text_from_pdf('sample.pdf')
+    chunks = chunk_text(pdf_text)
+    embeddings = embed_text_chunks(chunks)
+    faiss_index = build_faiss_index(embeddings)
+
+    retrieved_chunks = retrieve_relevant_chunks(query, faiss_index, model, tokenizer, chunks)
+
+    prompt_template = "Given the following context, {context}, generate a response to the query: {query}"
+    response = generate_response_with_ollama(retrieved_chunks, prompt_template)
+    
+    return jsonify({'response': response})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+
+#This will run your RAG service locally on http://localhost:5000.
+
+
+# java code for controlling the api
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
+
+@RestController
+public class ChatbotController {
+
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${rag.api.url}")
+    private String ragApiUrl;
+
+    @PostMapping("/chat")
+    public ResponseEntity<Map<String, String>> chat(@RequestBody Map<String, String> request) {
+        String userQuery = request.get("query");
+
+        Map<String, String> requestBody = Map.of("query", userQuery);
+        ResponseEntity<Map> response = restTemplate.postForEntity(ragApiUrl, requestBody, Map.class);
+        
+        Map<String, String> responseBody = response.getBody();
+        return ResponseEntity.ok(responseBody);
+    }
+}
+#ragApiUrl: This is the URL where your Python RAG service is hosted, e.g., http://localhost:5000/generate-response
+#Configure Application Properties
+#In your application.properties or application.yml, set the URL for the RAG service:
+rag.api.url=http://localhost:5000/generate-response
+#ex curl command
+curl -X POST http://localhost:8080/chat -H "Content-Type: application/json" -d '{"query": "What are the main findings of the report?"}'

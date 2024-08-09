@@ -1,0 +1,64 @@
+import PyPDF2
+
+def extract_text_from_pdf(pdf_path):
+    with open(pdf_path, 'rb') as file:
+        reader = PyPDF2.PdfFileReader(file)
+        text = ""
+        for page_num in range(reader.getNumPages()):
+            page = reader.getPage(page_num)
+            text += page.extractText()
+    return text
+#chunking
+def chunk_text(text, chunk_size=500):
+    words = text.split()
+    return [' '.join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
+# embed chunks
+from transformers import AutoTokenizer, AutoModel
+
+def embed_text_chunks(chunks, model_name='sentence-transformers/all-MiniLM-L6-v2'):
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModel.from_pretrained(model_name)
+    embeddings = []
+    for chunk in chunks:
+        inputs = tokenizer(chunk, return_tensors="pt", truncation=True, padding=True)
+        outputs = model(**inputs)
+        embeddings.append(outputs.last_hidden_state.mean(dim=1).detach().numpy())
+    return embeddings
+
+# store embeddings
+import faiss
+import numpy as np
+
+def build_faiss_index(embeddings):
+    dimension = embeddings[0].shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(np.array(embeddings))
+    return index
+#retrieve relevant chunks
+def retrieve_relevant_chunks(query, index, model, tokenizer, chunks, top_k=5):
+    inputs = tokenizer(query, return_tensors="pt", truncation=True, padding=True)
+    query_embedding = model(**inputs).last_hidden_state.mean(dim=1).detach().numpy()
+    distances, indices = index.search(query_embedding, top_k)
+    return [chunks[i] for i in indices[0]]
+
+#Ollama
+import requests
+
+def generate_response_with_ollama(retrieved_chunks, prompt_template):
+    context = " ".join(retrieved_chunks)
+    prompt = prompt_template.format(context=context)
+    response = requests.post('https://api.ollama.com/generate', json={'prompt': prompt})
+    return response.json()['text']
+
+# Example usage
+pdf_text = extract_text_from_pdf('sample.pdf')
+chunks = chunk_text(pdf_text)
+embeddings = embed_text_chunks(chunks)
+faiss_index = build_faiss_index(embeddings)
+
+query = "Explain the main findings of the report."
+retrieved_chunks = retrieve_relevant_chunks(query, faiss_index, model, tokenizer, chunks)
+
+prompt_template = "Given the following context, {context}, generate a response to the query: {query}"
+response = generate_response_with_ollama(retrieved_chunks, prompt_template)
+print(response)
