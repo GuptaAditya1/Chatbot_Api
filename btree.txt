@@ -1,0 +1,213 @@
+🌳 1. Root Node
+There is always one root.
+
+It starts the tick cycle of the tree.
+
+Connects to one child (usually a composite node).
+
+🧩 2. Composite Nodes
+They manage multiple child nodes and control the flow of decision-making.
+
+🔷 a) Sequence (AND logic)
+Ticks children in order.
+
+Returns:
+
+✅ SUCCESS → if all children succeed.
+
+❌ FAILURE → immediately, if any child fails.
+
+🔄 RUNNING → if any child is running.
+
+Use when all tasks must succeed.
+
+🔷 b) Selector (OR logic or Fallback)
+Ticks children in order.
+
+Returns:
+
+✅ SUCCESS → as soon as one child succeeds.
+
+❌ FAILURE → if all children fail.
+
+🔄 RUNNING → if any child is running.
+
+Use when only one successful behavior is enough.
+
+🔷 c) Parallel (optional in some frameworks)
+Ticks all children simultaneously.
+
+Success/failure rules vary (e.g., success if N of M succeed).
+
+Use for concurrent behaviors (e.g., moving + checking for enemies).
+
+🔁 3. Decorator Nodes
+Modify the behavior of a single child.
+
+Examples:
+
+Inverter:
+
+SUCCESS → FAILURE
+
+FAILURE → SUCCESS
+
+RUNNING → RUNNING
+
+Repeater:
+
+Repeats the child N times or until a condition is met.
+
+UntilSuccess or UntilFailure:
+
+Keep ticking until the child returns the target status.
+
+🔧 4. Leaf Nodes
+These are the actual action or condition checkers.
+
+🔸 a) Action nodes
+Perform something (e.g., move, attack, speak).
+
+Return:
+
+✅ SUCCESS
+
+❌ FAILURE
+
+🔄 RUNNING (if it takes time)
+
+🔸 b) Condition nodes
+Check for something (e.g., is enemy visible? is health low?).
+
+Return:
+
+✅ SUCCESS (if condition is met)
+
+❌ FAILURE (if not met)
+
+⏳ 5. Running Status
+When a node returns RUNNING, parent nodes remember that status and resume from the same node in the next tick.
+
+It allows modeling of time-consuming behaviors like "walk to point" or "charge weapon".
+
+📊 Node Status Summary
+Node Type	Children	Purpose	Returns
+Sequence	✅ Yes	AND logic, all must succeed	SUCCESS/FAILURE/RUNNING
+Selector	✅ Yes	OR logic, any can succeed	SUCCESS/FAILURE/RUNNING
+Decorator	✅ One	Modify child behavior	Modified child status
+Parallel	✅ Yes	Run multiple children	Based on config
+Condition	❌ No	Check something	SUCCESS/FAILURE
+Action	❌ No	Perform something	SUCCESS/FAILURE/RUNNING
+
+✅ TL;DR
+Sequence: All must succeed.
+
+Selector: One success is enough.
+
+Action/Condition: Leaf nodes, actual work or checks.
+
+Decorator: Modify child node behavior.
+
+Parallel: Run all at once.
+ Behavior Tree Rule: Sequence Node
+A Sequence node ticks its children in order and:
+
+Returns FAILURE immediately if any child fails.
+
+Returns SUCCESS only if all children succeed.
+
+Returns RUNNING if a child returns RUNNING.
+
+📘 Your Scenario: Nested Sequences
+Imagine this structure:
+
+pgsql
+Copy
+Edit
+Sequence A        ← Parent
+│
+├── Some Task
+├── Sequence B    ← Child (nested sequence)
+│   ├── Task 1
+│   └── Task 2
+│       └── returns FAILURE ← Grandchild fails
+└── More Tasks
+🧠 What Happens?
+Sequence A starts ticking.
+
+It ticks Some Task → succeeds.
+
+It ticks Sequence B.
+
+Sequence B ticks Task 1 → succeeds.
+
+Sequence B ticks Task 2 → FAILS.
+
+So, Sequence B → FAILS.
+
+Therefore, Sequence A → FAILS immediately, and it stops ticking further children like More Tasks.
+
+✅ Conclusion
+Yes, if a grandchild of a sequence fails, and that failure causes its parent sequence to fail, then the top-level sequence will also fail — because failure propagates upward through the tree.
+
+Let me know if you want a visual diagram or a code example using py_trees or another framework.
+
+
+
+
+
+
+
+You said:
+what about a nested selector and child returns success
+
+
+ChatGPT said:
+Great follow-up! Let's now look at how nested Selector nodes behave in behavior trees.
+
+🌟 Behavior Tree Rule: Selector Node
+A Selector node (sometimes called a fallback node):
+
+Ticks its children in order.
+
+Returns SUCCESS as soon as one child returns SUCCESS.
+
+Returns FAILURE only if all children fail.
+
+Returns RUNNING if a child returns RUNNING.
+
+📘 Scenario: Nested Selectors with a Successful Grandchild
+Structure:
+
+arduino
+Copy
+Edit
+Selector A        ← Top-level Selector
+│
+├── Task X
+├── Selector B    ← Nested Selector
+│   ├── Task Y
+│   └── Task Z
+│       └── returns SUCCESS ← Grandchild
+└── Task W
+🧠 What Happens?
+Selector A starts ticking.
+
+It ticks Task X → fails.
+
+It ticks Selector B:
+
+Task Y → fails.
+
+Task Z → succeeds ✅.
+
+So, Selector B → SUCCESS.
+
+Therefore, Selector A → SUCCESS, and it stops ticking further children like Task W.
+
+✅ Conclusion
+If a grandchild of a nested selector returns SUCCESS, and that makes its immediate parent selector succeed, then the top-level selector also returns SUCCESS — because success propagates upward just like failure does in sequences.
+
+In a behavior tree, nodes determine how an agent behaves based on structured, logical decisions. Each node has specific rules on how it executes, returns status, and interacts with its parent.
+
+Let’s break down the main types of behavior tree nodes:
